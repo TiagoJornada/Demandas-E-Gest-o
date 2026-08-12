@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 # ===============================
@@ -20,6 +20,16 @@ URL_APPS_SCRIPT = (
 "AKfycbzcaCjVUdWD8rTna15_4v512oBd9KRIvU5R4S4QvVc6o1VXff4tBE1DJcTf5y2zTUv8"
 "/exec"
 )
+
+
+CATEGORIAS = [
+    "Médico",
+    "Residente",
+    "Técnico em Radiologia",
+    "Técnico em Enfermagem",
+    "Enfermagem",
+    "Administrativo",
+]
 
 
 # ===============================
@@ -95,7 +105,7 @@ st.markdown(
 📋 Gestão UDI
 </div>
 
-Sistema de registro e acompanhamento administrativo
+Livro de registro de ocorrências do setor
 
 """,
 unsafe_allow_html=True
@@ -110,20 +120,18 @@ unsafe_allow_html=True
 menu = st.sidebar.selectbox(
     "Menu",
     [
-        "📌 Demandas",
-        "🏖 Férias",
-        "📄 Abonos",
-        "🚑 Afastamentos"
+        "📌 Registrar Demanda",
+        "📖 Consultar Ocorrências"
     ]
 )
 
 
 
 # ===============================
-# DEMANDAS
+# REGISTRAR DEMANDA
 # ===============================
 
-if menu == "📌 Demandas":
+if menu == "📌 Registrar Demanda":
 
     st.subheader("Registrar demanda")
 
@@ -132,6 +140,12 @@ if menu == "📌 Demandas":
 
         solicitante = st.text_input(
             "Solicitante"
+        )
+
+
+        categoria = st.selectbox(
+            "Categoria",
+            CATEGORIAS
         )
 
 
@@ -170,7 +184,8 @@ if menu == "📌 Demandas":
                     setor,
                     descricao,
                     "Aberto",
-                    ""
+                    "",
+                    categoria
                 ]
             )
 
@@ -181,144 +196,98 @@ if menu == "📌 Demandas":
 
 
 # ===============================
-# FÉRIAS
+# CONSULTAR OCORRÊNCIAS
 # ===============================
 
-elif menu == "🏖 Férias":
+elif menu == "📖 Consultar Ocorrências":
 
-    st.subheader(
-        "Registro de férias"
-    )
+    st.subheader("Consultar ocorrências")
 
+    col_periodo, col_categoria = st.columns([1, 2])
 
-    with st.form("ferias"):
-
-        servidor = st.text_input(
-            "Servidor"
+    with col_periodo:
+        periodo = st.radio(
+            "Período",
+            ["Hoje", "Ontem", "Últimos 7 dias", "Personalizado"],
+            horizontal=False
         )
 
-        inicio = st.date_input(
-            "Início"
-        )
+        if periodo == "Personalizado":
+            data_inicio = st.date_input(
+                "De",
+                value=datetime.now().date() - timedelta(days=1)
+            )
+            data_fim = st.date_input(
+                "Até",
+                value=datetime.now().date()
+            )
+        elif periodo == "Hoje":
+            data_inicio = data_fim = datetime.now().date()
+        elif periodo == "Ontem":
+            data_inicio = data_fim = datetime.now().date() - timedelta(days=1)
+        else:  # Últimos 7 dias
+            data_inicio = datetime.now().date() - timedelta(days=6)
+            data_fim = datetime.now().date()
 
-        fim = st.date_input(
-            "Fim"
-        )
+    df = ler_google("Demandas")
 
-        obs = st.text_input(
-            "Observação"
-        )
+    if df.empty:
+        st.info("Nenhuma ocorrência registrada ainda.")
+    else:
+        # Identifica a coluna de data/hora de forma flexível
+        col_data = None
+        for c in df.columns:
+            if "data" in c.lower():
+                col_data = c
+                break
 
-
-        if st.form_submit_button(
-            "Salvar"
-        ):
-
-            salvar_google(
-                "Ferias",
-                [
-                    servidor,
-                    str(inicio),
-                    str(fim),
-                    obs
-                ]
+        if col_data is None:
+            st.warning(
+                "Não foi possível identificar a coluna de data na planilha."
+            )
+        else:
+            df["_data_convertida"] = pd.to_datetime(
+                df[col_data],
+                format="%d/%m/%Y %H:%M",
+                errors="coerce"
             )
 
-            st.success(
-                "Férias registradas"
+            with col_categoria:
+                if "Categoria" in df.columns:
+                    categorias_disponiveis = sorted(
+                        [c for c in df["Categoria"].unique() if c]
+                    )
+                    filtro_categoria = st.multiselect(
+                        "Categoria",
+                        categorias_disponiveis,
+                        default=categorias_disponiveis
+                    )
+                else:
+                    filtro_categoria = None
+                    st.caption(
+                        "Coluna \"Categoria\" ainda não encontrada na planilha "
+                        "(adicione o cabeçalho na aba Demandas para habilitar este filtro)."
+                    )
+
+            filtrado = df[
+                (df["_data_convertida"].dt.date >= data_inicio)
+                & (df["_data_convertida"].dt.date <= data_fim)
+            ]
+
+            if filtro_categoria:
+                filtrado = filtrado[filtrado["Categoria"].isin(filtro_categoria)]
+
+            filtrado = filtrado.sort_values(
+                "_data_convertida", ascending=False
+            ).drop(columns=["_data_convertida"])
+
+            st.markdown(f"**{len(filtrado)} ocorrência(s) encontrada(s)**")
+
+            st.dataframe(
+                filtrado,
+                use_container_width=True,
+                hide_index=True
             )
 
-
-
-# ===============================
-# ABONOS
-# ===============================
-
-elif menu == "📄 Abonos":
-
-    st.subheader(
-        "Registro de abono"
-    )
-
-
-    with st.form("abono"):
-
-        servidor = st.text_input(
-            "Servidor"
-        )
-
-        data = st.date_input(
-            "Data"
-        )
-
-        motivo = st.text_input(
-            "Motivo"
-        )
-
-
-        if st.form_submit_button(
-            "Salvar"
-        ):
-
-            salvar_google(
-                "Abonos",
-                [
-                    servidor,
-                    str(data),
-                    motivo
-                ]
-            )
-
-            st.success(
-                "Abono registrado"
-            )
-
-
-
-# ===============================
-# AFASTAMENTOS
-# ===============================
-
-elif menu == "🚑 Afastamentos":
-
-    st.subheader(
-        "Registro de afastamento"
-    )
-
-
-    with st.form("afastamento"):
-
-        servidor = st.text_input(
-            "Servidor"
-        )
-
-        inicio = st.date_input(
-            "Início"
-        )
-
-        fim = st.date_input(
-            "Fim"
-        )
-
-        motivo = st.text_input(
-            "Motivo"
-        )
-
-
-        if st.form_submit_button(
-            "Salvar"
-        ):
-
-            salvar_google(
-                "Afastamentos",
-                [
-                    servidor,
-                    str(inicio),
-                    str(fim),
-                    motivo
-                ]
-            )
-
-            st.success(
-                "Afastamento registrado"
-            )
+    if st.button("🔄 Atualizar agora"):
+        st.rerun()
