@@ -218,8 +218,8 @@ def tela_consulta(aba):
             )
 
     filtrado = df[
-        (df["_data_convertida"].dt.date >= data_inicio)
-        & (df["_data_convertida"].dt.date <= data_fim)
+        (df["_data_convertida"] >= pd.Timestamp(data_inicio))
+        & (df["_data_convertida"] < pd.Timestamp(data_fim) + pd.Timedelta(days=1))
     ]
 
     if filtro_categoria:
