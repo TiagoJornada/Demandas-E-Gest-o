@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 # ===============================
 
 st.set_page_config(
-    page_title="Gestão UDI",
+    page_title="Registros Digitais UDI",
     page_icon="📋",
     layout="wide"
 )
