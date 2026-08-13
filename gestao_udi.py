@@ -193,11 +193,25 @@ def tela_consulta(aba):
         )
         return
 
-    df["_data_convertida"] = pd.to_datetime(
-        df[col_data],
-        format="%d/%m/%Y %H:%M",
-        errors="coerce"
-    )
+    bruto = df[col_data]
+
+    # O Google Sheets costuma converter automaticamente o texto em um valor
+    # de data/hora de verdade, devolvido pelo Apps Script em UTC (ex.:
+    # "2026-08-12T23:08:00.000Z"). Convertemos de volta para o horário de
+    # Brasília para recuperar os mesmos números que foram digitados.
+    convertido = pd.to_datetime(bruto, utc=True, errors="coerce")
+    convertido = convertido.dt.tz_convert("America/Sao_Paulo").dt.tz_localize(None)
+
+    # Linhas que não são data "de verdade" (texto simples, formato antigo)
+    # caem aqui como reserva.
+    faltantes = convertido.isna()
+    if faltantes.any():
+        tentativa_texto = pd.to_datetime(
+            bruto[faltantes], format="%d/%m/%Y %H:%M", errors="coerce"
+        )
+        convertido.loc[faltantes] = tentativa_texto
+
+    df["_data_convertida"] = convertido
 
     with col_categoria:
         if "Categoria" in df.columns:
@@ -221,15 +235,6 @@ def tela_consulta(aba):
         (df["_data_convertida"] >= pd.Timestamp(data_inicio))
         & (df["_data_convertida"] < pd.Timestamp(data_fim) + pd.Timedelta(days=1))
     ]
-
-    with st.expander("🔧 Diagnóstico (temporário)"):
-        st.write("Período selecionado:", periodo)
-        st.write("data_inicio:", data_inicio, "| data_fim:", data_fim)
-        st.write("Coluna de data identificada:", col_data)
-        st.write("Valores originais da coluna de data:", df[col_data].tolist())
-        st.write("Valores convertidos (_data_convertida):", df["_data_convertida"].tolist())
-        st.write("Tipo da coluna convertida:", str(df["_data_convertida"].dtype))
-        st.write("Linhas com data não reconhecida (NaT):", int(df["_data_convertida"].isna().sum()))
 
     if filtro_categoria:
         filtrado = filtrado[filtrado["Categoria"].isin(filtro_categoria)]
