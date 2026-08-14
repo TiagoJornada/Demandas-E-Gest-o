@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 # ===============================
 
 st.set_page_config(
-    page_title="Registros Digitais UDI",
+    page_title="Livro Digital de Registros",
     page_icon="📋",
     layout="wide"
 )
@@ -120,7 +120,7 @@ font-weight:bold;
 st.markdown(
 """
 <div class="titulo">
-📋 Gestão UDI
+📋 Livro Digital de Registros
 </div>
 
 Livro de registro de ocorrências do setor
@@ -218,11 +218,15 @@ def tela_consulta(aba):
             categorias_disponiveis = sorted(
                 [c for c in df["Categoria"].unique() if c]
             )
-            filtro_categoria = st.multiselect(
+            categoria_escolhida = st.selectbox(
                 "Categoria",
-                categorias_disponiveis,
-                default=categorias_disponiveis,
+                ["Todas as categorias"] + categorias_disponiveis,
                 key=f"categoria_{aba}"
+            )
+            filtro_categoria = (
+                None
+                if categoria_escolhida == "Todas as categorias"
+                else categoria_escolhida
             )
         else:
             filtro_categoria = None
@@ -234,21 +238,39 @@ def tela_consulta(aba):
     filtrado = df[
         (df["_data_convertida"] >= pd.Timestamp(data_inicio))
         & (df["_data_convertida"] < pd.Timestamp(data_fim) + pd.Timedelta(days=1))
-    ]
+    ].copy()
 
     if filtro_categoria:
-        filtrado = filtrado[filtrado["Categoria"].isin(filtro_categoria)]
+        filtrado = filtrado[filtrado["Categoria"] == filtro_categoria]
 
-    filtrado = filtrado.sort_values(
-        "_data_convertida", ascending=False
-    ).drop(columns=["_data_convertida"])
+    filtrado = filtrado.sort_values("_data_convertida", ascending=False)
+
+    # Mostra a data/hora já corrigida (dd/mm/aaaa hh:mm) em vez do valor
+    # bruto vindo da planilha.
+    filtrado[col_data] = filtrado["_data_convertida"].dt.strftime("%d/%m/%Y %H:%M")
+    filtrado = filtrado.drop(columns=["_data_convertida"])
 
     st.markdown(f"**{len(filtrado)} ocorrência(s) encontrada(s)**")
+
+    colunas_prioritarias = [
+        c for c in [col_data, "Solicitante", "Setor", "Descrição"]
+        if c in filtrado.columns
+    ]
+    colunas_restantes = [
+        c for c in filtrado.columns if c not in colunas_prioritarias
+    ]
 
     st.dataframe(
         filtrado,
         use_container_width=True,
-        hide_index=True
+        hide_index=True,
+        column_order=colunas_prioritarias + colunas_restantes,
+        column_config={
+            col_data: st.column_config.TextColumn("Data/Hora", width="small"),
+            "Solicitante": st.column_config.TextColumn(width="small"),
+            "Setor": st.column_config.TextColumn(width="small"),
+            "Descrição": st.column_config.TextColumn(width="large"),
+        }
     )
 
     if st.button("🔄 Atualizar agora", key=f"atualizar_{aba}"):
