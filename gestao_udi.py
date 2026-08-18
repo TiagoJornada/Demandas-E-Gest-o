@@ -32,6 +32,7 @@ CATEGORIAS = [
     "Residente",
     "Técnico em Enfermagem",
     "Técnico em Radiologia",
+    "Tecnólogo em Radiologia",
 ]
 
 
