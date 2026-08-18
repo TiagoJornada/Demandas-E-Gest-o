@@ -24,15 +24,14 @@ URL_APPS_SCRIPT = (
 
 
 CATEGORIAS = [
-    "Administrativo",
-    "Enfermagem",
-    "Farmacêutico",
-    "Físico Médico",
-    "Médico",
+    "Administrativa(o)",
+    "Enfermeira(o)",
+    "Farmacêutica(o)",
+    "Física(o) Médica(o)",
+    "Médica(o)",
     "Residente",
-    "Técnico em Enfermagem",
-    "Técnico em Radiologia",
-    "Tecnólogo em Radiologia",
+    "Técnica(o) em Enfermagem",
+    "Técnica(o) em Radiologia",
 ]
 
 
