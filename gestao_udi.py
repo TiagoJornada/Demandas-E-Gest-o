@@ -40,6 +40,33 @@ CATEGORIAS = [
 # nunca escrita diretamente aqui no código.
 SENHA_CHEFIA = os.getenv("SENHA_CHEFIA", "")
 
+# Configuração do bot do Telegram para notificações urgentes.
+# Também configuradas como variáveis de ambiente no Render.
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
+
+def enviar_notificacao_telegram(mensagem):
+    """Envia uma mensagem pelo bot do Telegram. Nunca interrompe o
+    registro da demanda caso falhe — só avisa na tela."""
+
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return False, "Notificação por Telegram ainda não configurada."
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+
+    try:
+        resposta = requests.post(
+            url,
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": mensagem},
+            timeout=10
+        )
+        if resposta.status_code == 200:
+            return True, ""
+        return False, f"Telegram respondeu com erro (status {resposta.status_code})."
+    except requests.RequestException as erro:
+        return False, f"Falha ao enviar notificação: {erro}"
+
 
 # ===============================
 # FUNÇÕES GOOGLE SHEETS
@@ -345,6 +372,12 @@ if menu == "📌 Registrar Demanda":
         )
 
 
+        urgente = st.checkbox(
+            "🔔 Notificar agora (urgente) — ex.: equipamento parado, "
+            "ar-condicionado, situação que precisa de atenção imediata"
+        )
+
+
         enviar = st.form_submit_button(
             "Registrar"
         )
@@ -378,6 +411,20 @@ if menu == "📌 Registrar Demanda":
                 st.success(
                     "Demanda registrada!"
                 )
+
+            if urgente:
+                mensagem = (
+                    "🔔 Ocorrência urgente registrada\n"
+                    f"Categoria: {categoria}\n"
+                    f"Setor: {setor}\n"
+                    f"Solicitante: {solicitante}\n"
+                    f"Descrição: {descricao}"
+                )
+                ok, erro = enviar_notificacao_telegram(mensagem)
+                if ok:
+                    st.info("🔔 Notificação enviada.")
+                else:
+                    st.warning(f"Demanda registrada, mas a notificação não foi enviada: {erro}")
 
 
 
