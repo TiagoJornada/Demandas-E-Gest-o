@@ -323,6 +323,13 @@ if menu == "📌 Registrar Demanda":
                 "Mamografia",
                 "Ultrassom",
                 "Densitometria",
+                "Ressonância Magnética",
+                "Medicina Nuclear",
+                "PET/CT",
+                "Iodoterapia",
+                "Sala de Laudos",
+                "Centro Cirúrgico",
+                "Recepção",
                 "Outros"
             ]
         )
