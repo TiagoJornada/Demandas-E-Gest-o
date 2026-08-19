@@ -118,20 +118,27 @@ def ler_google(aba):
 
 def listar_usuarios():
     """Busca a lista de solicitantes cadastrados na aba 'Usuarios'.
-    Se a aba não existir, estiver vazia, ou der erro, devolve uma lista
-    vazia — o campo Solicitante cai de volta para texto livre nesse caso."""
+    Devolve (lista_de_nomes, motivo_se_vazia)."""
 
     try:
         df = ler_google("Usuarios")
-    except RuntimeError:
-        return []
+    except RuntimeError as erro:
+        return [], f"erro ao ler a aba: {erro}"
 
-    if df.empty or "Nome" not in df.columns:
-        return []
+    if df.empty:
+        return [], "a aba \"Usuarios\" está vazia ou não foi encontrada"
 
-    return sorted(
+    if "Nome" not in df.columns:
+        return [], f"não encontrei a coluna \"Nome\" (colunas encontradas: {list(df.columns)})"
+
+    nomes = sorted(
         [n for n in df["Nome"].unique() if n and str(n).strip()]
     )
+
+    if not nomes:
+        return [], "a coluna \"Nome\" existe, mas não tem nenhum valor preenchido"
+
+    return nomes, None
 
 
 
@@ -339,7 +346,7 @@ if menu == "📌 Registrar Relato":
 
     st.subheader("Registrar relato")
 
-    usuarios = listar_usuarios()
+    usuarios, motivo = listar_usuarios()
 
     with st.form("relato"):
 
@@ -353,7 +360,7 @@ if menu == "📌 Registrar Relato":
                 "Solicitante"
             )
             st.caption(
-                "Lista de solicitantes ainda vazia — cadastre em "
+                f"Lista de solicitantes ainda vazia ({motivo}) — cadastre em "
                 "\"👤 Gerenciar Usuários\" para virar lista suspensa."
             )
 
@@ -474,13 +481,13 @@ elif menu == "👤 Gerenciar Usuários":
         elif senha_digitada != SENHA_ADMIN:
             st.error("Senha incorreta.")
         else:
-            usuarios = listar_usuarios()
+            usuarios, motivo = listar_usuarios()
 
             st.markdown("**Usuários cadastrados atualmente:**")
             if usuarios:
                 st.write(", ".join(usuarios))
             else:
-                st.caption("Nenhum usuário cadastrado ainda.")
+                st.caption(f"Nenhum usuário cadastrado ainda ({motivo}).")
 
             st.divider()
 
