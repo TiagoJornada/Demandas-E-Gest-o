@@ -163,7 +163,7 @@ font-weight:bold;
 """, unsafe_allow_html=True)
 
 
-st.image("banner.png", use_container_width=False, width=520)
+st.image("banner.png", width=220)
 
 st.caption("Livro de registro de ocorrências do setor")
 
