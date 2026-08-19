@@ -163,17 +163,9 @@ font-weight:bold;
 """, unsafe_allow_html=True)
 
 
-st.markdown(
-"""
-<div class="titulo">
-📋 Livro Digital de Registros
-</div>
+st.image("banner.png", use_container_width=False, width=520)
 
-Livro de registro de ocorrências do setor
-
-""",
-unsafe_allow_html=True
-)
+st.caption("Livro de registro de ocorrências do setor")
 
 
 
