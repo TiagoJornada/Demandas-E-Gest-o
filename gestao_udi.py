@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 st.set_page_config(
     page_title="Livro Digital de Registros",
-    page_icon="📋",
+    page_icon="icone.png",
     layout="wide"
 )
 
@@ -35,15 +35,15 @@ CATEGORIAS = [
 ]
 
 
-# Senha de acesso à área confidencial (chefia/supervisão).
-# Configurada como variável de ambiente no Render (Settings > Environment),
-# nunca escrita diretamente aqui no código.
-SENHA_CHEFIA = os.getenv("SENHA_CHEFIA", "")
-
 # Configuração do bot do Telegram para notificações urgentes.
-# Também configuradas como variáveis de ambiente no Render.
+# Configuradas como variáveis de ambiente no Render.
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
+# Senha para gerenciar usuários (adicionar solicitantes à lista).
+# Reaproveita a variável SENHA_CHEFIA já configurada no Render, caso
+# SENHA_ADMIN não exista — assim não é preciso cadastrar nada novo agora.
+SENHA_ADMIN = os.getenv("SENHA_ADMIN", "") or os.getenv("SENHA_CHEFIA", "")
 
 
 def enviar_notificacao_telegram(mensagem):
@@ -113,6 +113,25 @@ def ler_google(aba):
         )
 
     return pd.DataFrame()
+
+
+
+def listar_usuarios():
+    """Busca a lista de solicitantes cadastrados na aba 'Usuarios'.
+    Se a aba não existir, estiver vazia, ou der erro, devolve uma lista
+    vazia — o campo Solicitante cai de volta para texto livre nesse caso."""
+
+    try:
+        df = ler_google("Usuarios")
+    except RuntimeError:
+        return []
+
+    if df.empty or "Nome" not in df.columns:
+        return []
+
+    return sorted(
+        [n for n in df["Nome"].unique() if n and str(n).strip()]
+    )
 
 
 
@@ -312,28 +331,39 @@ def tela_consulta(aba):
 menu = st.sidebar.selectbox(
     "Menu",
     [
-        "📌 Registrar Demanda",
+        "📌 Registrar Relato",
         "📖 Consultar Ocorrências",
-        "🔒 Confidenciais (chefia)"
+        "👤 Gerenciar Usuários"
     ]
 )
 
 
 
 # ===============================
-# REGISTRAR DEMANDA
+# REGISTRAR RELATO
 # ===============================
 
-if menu == "📌 Registrar Demanda":
+if menu == "📌 Registrar Relato":
 
-    st.subheader("Registrar demanda")
+    st.subheader("Registrar relato")
 
+    usuarios = listar_usuarios()
 
-    with st.form("demanda"):
+    with st.form("relato"):
 
-        solicitante = st.text_input(
-            "Solicitante"
-        )
+        if usuarios:
+            solicitante = st.selectbox(
+                "Solicitante",
+                usuarios
+            )
+        else:
+            solicitante = st.text_input(
+                "Solicitante"
+            )
+            st.caption(
+                "Lista de solicitantes ainda vazia — cadastre em "
+                "\"👤 Gerenciar Usuários\" para virar lista suspensa."
+            )
 
 
         categoria = st.selectbox(
@@ -363,12 +393,7 @@ if menu == "📌 Registrar Demanda":
 
 
         descricao = st.text_area(
-            "Descrição da demanda"
-        )
-
-
-        confidencial = st.checkbox(
-            "🔒 Ocorrência confidencial (visível apenas para chefia/supervisão)"
+            "Descrição do relato"
         )
 
 
@@ -385,10 +410,8 @@ if menu == "📌 Registrar Demanda":
 
         if enviar:
 
-            aba_destino = "Confidenciais" if confidencial else "Demandas"
-
             salvar_google(
-                aba_destino,
+                "Demandas",
                 [
                     datetime.now().strftime(
                         "%d/%m/%Y %H:%M"
@@ -402,15 +425,9 @@ if menu == "📌 Registrar Demanda":
                 ]
             )
 
-            if confidencial:
-                st.success(
-                    "Demanda registrada como confidencial — visível apenas "
-                    "na área de chefia/supervisão."
-                )
-            else:
-                st.success(
-                    "Demanda registrada!"
-                )
+            st.success(
+                "Relato registrado!"
+            )
 
             if urgente:
                 mensagem = (
@@ -424,7 +441,7 @@ if menu == "📌 Registrar Demanda":
                 if ok:
                     st.info("🔔 Notificação enviada.")
                 else:
-                    st.warning(f"Demanda registrada, mas a notificação não foi enviada: {erro}")
+                    st.warning(f"Relato registrado, mas a notificação não foi enviada: {erro}")
 
 
 
@@ -441,27 +458,54 @@ elif menu == "📖 Consultar Ocorrências":
 
 
 # ===============================
-# CONFIDENCIAIS (CHEFIA)
+# GERENCIAR USUÁRIOS
 # ===============================
 
-elif menu == "🔒 Confidenciais (chefia)":
+elif menu == "👤 Gerenciar Usuários":
 
-    st.subheader("Ocorrências confidenciais")
+    st.subheader("Gerenciar usuários")
 
-    if not SENHA_CHEFIA:
+    if not SENHA_ADMIN:
         st.warning(
             "Área ainda não configurada: defina a variável de ambiente "
-            "SENHA_CHEFIA nas configurações do serviço no Render."
+            "SENHA_ADMIN (ou SENHA_CHEFIA) nas configurações do serviço "
+            "no Render."
         )
     else:
         senha_digitada = st.text_input(
-            "Senha de acesso",
+            "Senha de gerenciamento",
             type="password"
         )
 
         if senha_digitada == "":
-            st.info("Digite a senha para acessar os registros confidenciais.")
-        elif senha_digitada != SENHA_CHEFIA:
+            st.info("Digite a senha para gerenciar os usuários.")
+        elif senha_digitada != SENHA_ADMIN:
             st.error("Senha incorreta.")
         else:
-            tela_consulta("Confidenciais")
+            usuarios = listar_usuarios()
+
+            st.markdown("**Usuários cadastrados atualmente:**")
+            if usuarios:
+                st.write(", ".join(usuarios))
+            else:
+                st.caption("Nenhum usuário cadastrado ainda.")
+
+            st.divider()
+
+            with st.form("novo_usuario", clear_on_submit=True):
+                novo_nome = st.text_input("Nome completo do novo usuário")
+                adicionar = st.form_submit_button("Adicionar")
+
+                if adicionar:
+                    if not novo_nome.strip():
+                        st.warning("Digite um nome antes de adicionar.")
+                    elif novo_nome.strip() in usuarios:
+                        st.warning("Esse nome já está cadastrado.")
+                    else:
+                        salvar_google("Usuarios", [novo_nome.strip()])
+                        st.success(f"\"{novo_nome.strip()}\" adicionado! Atualize a página para ver na lista.")
+
+            st.caption(
+                "Remover um usuário ainda precisa ser feito direto na "
+                "planilha (aba \"Usuarios\"), apagando a linha correspondente."
+            )
