@@ -396,6 +396,13 @@ if menu == "📌 Registrar Relato":
         )
 
 
+        observacao = st.text_input(
+            "Observação (opcional)",
+            help="Ex.: número do chamado técnico aberto, encaminhamento dado, "
+                 "ou qualquer complemento útil ao relato."
+        )
+
+
         urgente = st.checkbox(
             "🔔 Notificar agora (urgente) — ex.: equipamento parado, "
             "ar-condicionado, situação que precisa de atenção imediata"
@@ -419,7 +426,7 @@ if menu == "📌 Registrar Relato":
                     setor,
                     descricao,
                     "Aberto",
-                    "",
+                    observacao,
                     categoria
                 ]
             )
