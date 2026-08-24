@@ -60,12 +60,12 @@ def salvar_google(aba, linha, tentativas=3):
             resposta = requests.post(
                 URL_APPS_SCRIPT,
                 json=dados,
-                timeout=20
+                timeout=12
             )
             return resposta.text
         except requests.RequestException:
             if tentativa < tentativas - 1:
-                time.sleep(2)
+                time.sleep(1)
                 continue
             raise
 
@@ -87,10 +87,10 @@ def definir_senha_usuario(nome, senha, tentativas=3):
     for tentativa in range(tentativas):
 
         try:
-            resposta = requests.post(URL_APPS_SCRIPT, json=dados, timeout=20)
+            resposta = requests.post(URL_APPS_SCRIPT, json=dados, timeout=12)
         except requests.RequestException as erro:
             ultimo_erro = f"falha de conexão: {erro}"
-            time.sleep(2)
+            time.sleep(1)
             continue
 
         try:
@@ -101,7 +101,7 @@ def definir_senha_usuario(nome, senha, tentativas=3):
                 f"resposta inválida do Apps Script (status HTTP {resposta.status_code}). "
                 f"Trecho recebido: {trecho}"
             )
-            time.sleep(2)
+            time.sleep(1)
             continue
 
         if resultado.get("status") == "OK":
@@ -124,11 +124,11 @@ def ler_google(aba, tentativas=3):
             resposta = requests.get(
                 URL_APPS_SCRIPT,
                 params={"aba": aba},
-                timeout=20
+                timeout=12
             )
         except requests.RequestException as erro:
             ultimo_erro = f"falha de conexão: {erro}"
-            time.sleep(2)
+            time.sleep(1)
             continue
 
         try:
@@ -138,7 +138,7 @@ def ler_google(aba, tentativas=3):
                 "O Google Apps Script não retornou dados em formato válido "
                 f"para leitura (status HTTP {resposta.status_code})."
             )
-            time.sleep(2)
+            time.sleep(1)
             continue
 
         if len(dados) > 1:
