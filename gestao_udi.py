@@ -117,6 +117,38 @@ def listar_usuarios():
 
 
 
+def buscar_credenciais_usuarios():
+    """Busca nome + senha individual de cada usuário cadastrado na aba
+    'Usuarios'. Devolve (dicionario {nome: senha}, motivo_se_vazio)."""
+
+    try:
+        df = ler_google("Usuarios")
+    except RuntimeError as erro:
+        return {}, f"erro ao ler a aba: {erro}"
+
+    if df.empty:
+        return {}, "a aba \"Usuarios\" está vazia ou não foi encontrada"
+
+    if "Nome" not in df.columns or "Senha" not in df.columns:
+        return {}, (
+            "não encontrei as colunas \"Nome\" e \"Senha\" "
+            f"(colunas encontradas: {list(df.columns)})"
+        )
+
+    credenciais = {}
+    for _, linha in df.iterrows():
+        nome = str(linha["Nome"]).strip()
+        senha = str(linha["Senha"]).strip()
+        if nome:
+            credenciais[nome] = senha
+
+    if not credenciais:
+        return {}, "não há usuários cadastrados"
+
+    return credenciais, None
+
+
+
 # ===============================
 # ESTILO
 # ===============================
@@ -148,6 +180,42 @@ font-weight:bold;
 st.image("banner.png", width=220)
 
 st.caption("Livro de registro de ocorrências do setor")
+
+
+# ===============================
+# PORTÃO DE ACESSO
+# ===============================
+
+if "acesso_liberado" not in st.session_state:
+    st.session_state.acesso_liberado = False
+
+if not st.session_state.acesso_liberado:
+
+    st.subheader("Acesso restrito")
+    st.caption("Este sistema é de uso exclusivo da equipe da UDI. Entre com seu nome e sua senha individual.")
+
+    credenciais, motivo_credenciais = buscar_credenciais_usuarios()
+
+    if not credenciais:
+        st.warning(
+            "Ainda não há usuários com senha individual cadastrados "
+            f"({motivo_credenciais}). Peça para a chefia configurar a "
+            "coluna \"Senha\" na aba \"Usuarios\" da planilha."
+        )
+        st.stop()
+
+    nome_login = st.selectbox("Seu nome", sorted(credenciais.keys()), key="login_nome")
+    senha_login = st.text_input("Sua senha", type="password", key="login_senha")
+
+    if st.button("Entrar"):
+        if nome_login and senha_login and senha_login == credenciais.get(nome_login):
+            st.session_state.acesso_liberado = True
+            st.session_state.usuario_logado = nome_login
+            st.rerun()
+        else:
+            st.error("Nome ou senha incorretos.")
+
+    st.stop()
 
 
 
@@ -311,6 +379,12 @@ menu = st.sidebar.selectbox(
     ]
 )
 
+st.sidebar.caption(f"Conectado como: {st.session_state.get('usuario_logado', '')}")
+if st.sidebar.button("Sair"):
+    st.session_state.acesso_liberado = False
+    st.session_state.usuario_logado = None
+    st.rerun()
+
 
 
 # ===============================
@@ -326,9 +400,14 @@ if menu == "📌 Registrar Relato":
     with st.form("relato"):
 
         if usuarios:
+            nome_logado = st.session_state.get("usuario_logado")
+            indice_padrao = (
+                usuarios.index(nome_logado) if nome_logado in usuarios else 0
+            )
             solicitante = st.selectbox(
                 "Solicitante",
-                usuarios
+                usuarios,
+                index=indice_padrao
             )
         else:
             solicitante = st.text_input(
@@ -455,15 +534,21 @@ elif menu == "👤 Gerenciar Usuários":
 
             with st.form("novo_usuario", clear_on_submit=True):
                 novo_nome = st.text_input("Nome completo do novo usuário")
+                nova_senha = st.text_input(
+                    "Senha individual para essa pessoa",
+                    help="Defina um código simples (ex.: 4 dígitos) para essa pessoa usar no login."
+                )
                 adicionar = st.form_submit_button("Adicionar")
 
                 if adicionar:
                     if not novo_nome.strip():
                         st.warning("Digite um nome antes de adicionar.")
+                    elif not nova_senha.strip():
+                        st.warning("Defina uma senha para essa pessoa.")
                     elif novo_nome.strip() in usuarios:
                         st.warning("Esse nome já está cadastrado.")
                     else:
-                        salvar_google("Usuarios", [novo_nome.strip()])
+                        salvar_google("Usuarios", [novo_nome.strip(), nova_senha.strip()])
                         st.success(f"\"{novo_nome.strip()}\" adicionado! Atualize a página para ver na lista.")
 
             st.caption(
