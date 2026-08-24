@@ -75,7 +75,7 @@ def definir_senha_usuario(nome, senha):
     }
 
     try:
-        resposta = requests.post(URL_APPS_SCRIPT, json=dados, timeout=10)
+        resposta = requests.post(URL_APPS_SCRIPT, json=dados, timeout=30)
     except requests.RequestException as erro:
         return False, f"falha de conexão: {erro}"
 
