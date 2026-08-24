@@ -18,7 +18,7 @@ st.set_page_config(
 
 URL_APPS_SCRIPT = (
 "https://script.google.com/macros/s/"
-"AKfycbyiXsKrvhVW0mMig394R4280TSd-Jif0tUYaxh259Wjk58M3bihGVgZRIf0i8UIoWff"
+"AKfycbxzDDKTmJxvLaQWgmR4PlihlpVlSHA57viHzSA5s7sw0tNDR3a_oi8yJmVxUrAdJv-G"
 "/exec"
 )
 
@@ -76,9 +76,17 @@ def definir_senha_usuario(nome, senha):
 
     try:
         resposta = requests.post(URL_APPS_SCRIPT, json=dados, timeout=10)
+    except requests.RequestException as erro:
+        return False, f"falha de conexão: {erro}"
+
+    try:
         resultado = resposta.json()
-    except (requests.RequestException, ValueError) as erro:
-        return False, f"falha ao gravar a senha: {erro}"
+    except ValueError:
+        trecho = resposta.text[:200] if resposta.text else "(vazio)"
+        return False, (
+            f"resposta inválida do Apps Script (status HTTP {resposta.status_code}). "
+            f"Trecho recebido: {trecho}"
+        )
 
     if resultado.get("status") == "OK":
         return True, ""
