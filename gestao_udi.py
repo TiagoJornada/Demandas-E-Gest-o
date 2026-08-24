@@ -35,37 +35,12 @@ CATEGORIAS = [
 ]
 
 
-# Configuração do bot do Telegram para notificações urgentes.
-# Configuradas como variáveis de ambiente no Render.
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
-
 # Senha para gerenciar usuários (adicionar solicitantes à lista).
 # Reaproveita a variável SENHA_CHEFIA já configurada no Render, caso
 # SENHA_ADMIN não exista — assim não é preciso cadastrar nada novo agora.
 SENHA_ADMIN = os.getenv("SENHA_ADMIN", "") or os.getenv("SENHA_CHEFIA", "")
 
 
-def enviar_notificacao_telegram(mensagem):
-    """Envia uma mensagem pelo bot do Telegram. Nunca interrompe o
-    registro da demanda caso falhe — só avisa na tela."""
-
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        return False, "Notificação por Telegram ainda não configurada."
-
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-
-    try:
-        resposta = requests.post(
-            url,
-            json={"chat_id": TELEGRAM_CHAT_ID, "text": mensagem},
-            timeout=10
-        )
-        if resposta.status_code == 200:
-            return True, ""
-        return False, f"Telegram respondeu com erro (status {resposta.status_code})."
-    except requests.RequestException as erro:
-        return False, f"Falha ao enviar notificação: {erro}"
 
 
 # ===============================
@@ -403,12 +378,6 @@ if menu == "📌 Registrar Relato":
         )
 
 
-        urgente = st.checkbox(
-            "🔔 Notificar agora (urgente) — ex.: equipamento parado, "
-            "ar-condicionado, situação que precisa de atenção imediata"
-        )
-
-
         enviar = st.form_submit_button(
             "Registrar"
         )
@@ -434,20 +403,6 @@ if menu == "📌 Registrar Relato":
             st.success(
                 "Relato registrado!"
             )
-
-            if urgente:
-                mensagem = (
-                    "🔔 Ocorrência urgente registrada\n"
-                    f"Categoria: {categoria}\n"
-                    f"Setor: {setor}\n"
-                    f"Solicitante: {solicitante}\n"
-                    f"Descrição: {descricao}"
-                )
-                ok, erro = enviar_notificacao_telegram(mensagem)
-                if ok:
-                    st.info("🔔 Notificação enviada.")
-                else:
-                    st.warning(f"Relato registrado, mas a notificação não foi enviada: {erro}")
 
 
 
