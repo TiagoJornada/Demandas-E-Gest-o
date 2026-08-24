@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 import os
+import time
 from datetime import datetime, timedelta
 
 
@@ -47,23 +48,30 @@ SENHA_ADMIN = os.getenv("SENHA_ADMIN", "") or os.getenv("SENHA_CHEFIA", "")
 # FUNÇÕES GOOGLE SHEETS
 # ===============================
 
-def salvar_google(aba, linha):
+def salvar_google(aba, linha, tentativas=3):
 
     dados = {
         "aba": aba,
         "linha": linha
     }
 
-    resposta = requests.post(
-        URL_APPS_SCRIPT,
-        json=dados
-    )
+    for tentativa in range(tentativas):
+        try:
+            resposta = requests.post(
+                URL_APPS_SCRIPT,
+                json=dados,
+                timeout=20
+            )
+            return resposta.text
+        except requests.RequestException:
+            if tentativa < tentativas - 1:
+                time.sleep(2)
+                continue
+            raise
 
-    return resposta.text
 
 
-
-def definir_senha_usuario(nome, senha):
+def definir_senha_usuario(nome, senha, tentativas=3):
     """Grava a senha individual de um usuário já existente na aba
     'Usuarios', localizando a linha pelo nome."""
 
@@ -74,52 +82,77 @@ def definir_senha_usuario(nome, senha):
         "senha": senha
     }
 
-    try:
-        resposta = requests.post(URL_APPS_SCRIPT, json=dados, timeout=30)
-    except requests.RequestException as erro:
-        return False, f"falha de conexão: {erro}"
+    ultimo_erro = None
 
-    try:
-        resultado = resposta.json()
-    except ValueError:
-        trecho = resposta.text[:200] if resposta.text else "(vazio)"
-        return False, (
-            f"resposta inválida do Apps Script (status HTTP {resposta.status_code}). "
-            f"Trecho recebido: {trecho}"
-        )
+    for tentativa in range(tentativas):
 
-    if resultado.get("status") == "OK":
-        return True, ""
+        try:
+            resposta = requests.post(URL_APPS_SCRIPT, json=dados, timeout=20)
+        except requests.RequestException as erro:
+            ultimo_erro = f"falha de conexão: {erro}"
+            time.sleep(2)
+            continue
 
-    return False, resultado.get("motivo", "erro desconhecido")
+        try:
+            resultado = resposta.json()
+        except ValueError:
+            trecho = resposta.text[:200] if resposta.text else "(vazio)"
+            ultimo_erro = (
+                f"resposta inválida do Apps Script (status HTTP {resposta.status_code}). "
+                f"Trecho recebido: {trecho}"
+            )
+            time.sleep(2)
+            continue
+
+        if resultado.get("status") == "OK":
+            return True, ""
+
+        return False, resultado.get("motivo", "erro desconhecido")
+
+    return False, f"{ultimo_erro} (tentei {tentativas} vezes)"
 
 
 
-def ler_google(aba):
+def ler_google(aba, tentativas=3):
 
-    resposta = requests.get(
-        URL_APPS_SCRIPT,
-        params={"aba": aba}
+    ultimo_erro = None
+
+    for tentativa in range(tentativas):
+
+        try:
+            resposta = requests.get(
+                URL_APPS_SCRIPT,
+                params={"aba": aba},
+                timeout=20
+            )
+        except requests.RequestException as erro:
+            ultimo_erro = f"falha de conexão: {erro}"
+            time.sleep(2)
+            continue
+
+        try:
+            dados = resposta.json()
+        except ValueError:
+            ultimo_erro = (
+                "O Google Apps Script não retornou dados em formato válido "
+                f"para leitura (status HTTP {resposta.status_code})."
+            )
+            time.sleep(2)
+            continue
+
+        if len(dados) > 1:
+            return pd.DataFrame(
+                dados[1:],
+                columns=dados[0]
+            )
+
+        return pd.DataFrame()
+
+    raise RuntimeError(
+        f"{ultimo_erro} (tentei {tentativas} vezes). Isso costuma acontecer "
+        "logo depois do sistema ficar um tempo sem uso — aguarde alguns "
+        "segundos e tente de novo."
     )
-
-    try:
-        dados = resposta.json()
-    except ValueError:
-        raise RuntimeError(
-            "O Google Apps Script não retornou dados em formato válido "
-            "para leitura (status HTTP "
-            f"{resposta.status_code}). "
-            "É provável que o script publicado ainda não tenha suporte "
-            "para leitura (função doGet)."
-        )
-
-    if len(dados) > 1:
-        return pd.DataFrame(
-            dados[1:],
-            columns=dados[0]
-        )
-
-    return pd.DataFrame()
 
 
 
