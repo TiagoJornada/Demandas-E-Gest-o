@@ -63,6 +63,30 @@ def salvar_google(aba, linha):
 
 
 
+def definir_senha_usuario(nome, senha):
+    """Grava a senha individual de um usuário já existente na aba
+    'Usuarios', localizando a linha pelo nome."""
+
+    dados = {
+        "aba": "Usuarios",
+        "acao": "definir_senha",
+        "nome": nome,
+        "senha": senha
+    }
+
+    try:
+        resposta = requests.post(URL_APPS_SCRIPT, json=dados, timeout=10)
+        resultado = resposta.json()
+    except (requests.RequestException, ValueError) as erro:
+        return False, f"falha ao gravar a senha: {erro}"
+
+    if resultado.get("status") == "OK":
+        return True, ""
+
+    return False, resultado.get("motivo", "erro desconhecido")
+
+
+
 def ler_google(aba):
 
     resposta = requests.get(
@@ -198,22 +222,59 @@ if not st.session_state.acesso_liberado:
 
     if not credenciais:
         st.warning(
-            "Ainda não há usuários com senha individual cadastrados "
-            f"({motivo_credenciais}). Peça para a chefia configurar a "
-            "coluna \"Senha\" na aba \"Usuarios\" da planilha."
+            "Ainda não há usuários cadastrados "
+            f"({motivo_credenciais}). Peça para a chefia cadastrar em "
+            "\"👤 Gerenciar Usuários\", ou verifique a coluna \"Senha\" na "
+            "aba \"Usuarios\" da planilha."
         )
         st.stop()
 
     nome_login = st.selectbox("Seu nome", sorted(credenciais.keys()), key="login_nome")
-    senha_login = st.text_input("Sua senha", type="password", key="login_senha")
+    senha_cadastrada = credenciais.get(nome_login, "")
 
-    if st.button("Entrar"):
-        if nome_login and senha_login and senha_login == credenciais.get(nome_login):
-            st.session_state.acesso_liberado = True
-            st.session_state.usuario_logado = nome_login
-            st.rerun()
-        else:
-            st.error("Nome ou senha incorretos.")
+    if not senha_cadastrada:
+
+        st.info("Primeiro acesso: crie uma senha de 4 dígitos para começar a usar o sistema.")
+        nova_senha = st.text_input(
+            "Crie uma senha (4 dígitos)",
+            type="password",
+            max_chars=4,
+            key="nova_senha"
+        )
+        confirmar_senha = st.text_input(
+            "Confirme a senha",
+            type="password",
+            max_chars=4,
+            key="confirmar_senha"
+        )
+
+        if st.button("Criar senha e entrar"):
+            if not nova_senha or not confirmar_senha:
+                st.error("Preencha os dois campos de senha.")
+            elif not (nova_senha.isdigit() and len(nova_senha) == 4):
+                st.error("A senha precisa ter exatamente 4 números (ex.: 4821).")
+            elif nova_senha != confirmar_senha:
+                st.error("As senhas não coincidem.")
+            else:
+                ok, erro = definir_senha_usuario(nome_login, nova_senha)
+                if ok:
+                    st.session_state.acesso_liberado = True
+                    st.session_state.usuario_logado = nome_login
+                    st.rerun()
+                else:
+                    st.error(f"Não foi possível criar a senha: {erro}")
+
+    else:
+
+        senha_login = st.text_input("Sua senha", type="password", key="login_senha")
+
+        if st.button("Entrar"):
+            if senha_login == senha_cadastrada:
+                st.session_state.acesso_liberado = True
+                st.session_state.usuario_logado = nome_login
+                st.rerun()
+            else:
+                st.error("Senha incorreta.")
 
     st.stop()
 
@@ -534,22 +595,19 @@ elif menu == "👤 Gerenciar Usuários":
 
             with st.form("novo_usuario", clear_on_submit=True):
                 novo_nome = st.text_input("Nome completo do novo usuário")
-                nova_senha = st.text_input(
-                    "Senha individual para essa pessoa",
-                    help="Defina um código simples (ex.: 4 dígitos) para essa pessoa usar no login."
-                )
                 adicionar = st.form_submit_button("Adicionar")
 
                 if adicionar:
                     if not novo_nome.strip():
                         st.warning("Digite um nome antes de adicionar.")
-                    elif not nova_senha.strip():
-                        st.warning("Defina uma senha para essa pessoa.")
                     elif novo_nome.strip() in usuarios:
                         st.warning("Esse nome já está cadastrado.")
                     else:
-                        salvar_google("Usuarios", [novo_nome.strip(), nova_senha.strip()])
-                        st.success(f"\"{novo_nome.strip()}\" adicionado! Atualize a página para ver na lista.")
+                        salvar_google("Usuarios", [novo_nome.strip(), ""])
+                        st.success(
+                            f"\"{novo_nome.strip()}\" adicionado! Na primeira vez que "
+                            "essa pessoa acessar o sistema, ela vai criar a própria senha."
+                        )
 
             st.caption(
                 "Remover um usuário ainda precisa ser feito direto na "
