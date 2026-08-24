@@ -113,6 +113,7 @@ def definir_senha_usuario(nome, senha, tentativas=3):
 
 
 
+@st.cache_data(ttl=30, show_spinner=False)
 def ler_google(aba, tentativas=3):
 
     ultimo_erro = None
@@ -299,6 +300,7 @@ if not st.session_state.acesso_liberado:
             else:
                 ok, erro = definir_senha_usuario(nome_login, nova_senha)
                 if ok:
+                    ler_google.clear()
                     st.session_state.acesso_liberado = True
                     st.session_state.usuario_logado = nome_login
                     st.rerun()
@@ -464,6 +466,7 @@ def tela_consulta(aba):
     )
 
     if st.button("🔄 Atualizar agora", key=f"atualizar_{aba}"):
+        ler_google.clear()
         st.rerun()
 
 
@@ -581,6 +584,8 @@ if menu == "📌 Registrar Relato":
                 ]
             )
 
+            ler_google.clear()
+
             st.success(
                 "Relato registrado!"
             )
@@ -645,6 +650,7 @@ elif menu == "👤 Gerenciar Usuários":
                         st.warning("Esse nome já está cadastrado.")
                     else:
                         salvar_google("Usuarios", [novo_nome.strip(), ""])
+                        ler_google.clear()
                         st.success(
                             f"\"{novo_nome.strip()}\" adicionado! Na primeira vez que "
                             "essa pessoa acessar o sistema, ela vai criar a própria senha."
